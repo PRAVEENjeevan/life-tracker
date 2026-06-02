@@ -25,12 +25,13 @@ import {
 // ---- PASTE YOUR FIREBASE CONFIG HERE ----
 // Get this from Firebase Console → Project Settings → Your apps → Web app
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_PROJECT_ID.appspot.com",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId: "YOUR_APP_ID"
+  apiKey: "AIzaSyAg43438l1fH4iH2pcYF5LLkJ_wf13Q_IQ",
+  authDomain: "life-tracker-11246.firebaseapp.com",
+  projectId: "life-tracker-11246",
+  storageBucket: "life-tracker-11246.firebasestorage.app",
+  messagingSenderId: "200949141083",
+  appId: "1:200949141083:web:04862e68635f66fd43b97e",
+  measurementId: "G-Q6PKFYYM5F"
 };
 // -----------------------------------------
 
