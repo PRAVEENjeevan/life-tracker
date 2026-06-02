@@ -25,13 +25,12 @@ import {
 // ---- PASTE YOUR FIREBASE CONFIG HERE ----
 // Get this from Firebase Console → Project Settings → Your apps → Web app
 const firebaseConfig = {
-  apiKey: "AIzaSyAg43438l1fH4iH2pcYF5LLkJ_wf13Q_IQ",
-  authDomain: "life-tracker-11246.firebaseapp.com",
-  projectId: "life-tracker-11246",
-  storageBucket: "life-tracker-11246.firebasestorage.app",
-  messagingSenderId: "200949141083",
-  appId: "1:200949141083:web:04862e68635f66fd43b97e",
-  measurementId: "G-Q6PKFYYM5F"
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+  projectId: "YOUR_PROJECT_ID",
+  storageBucket: "YOUR_PROJECT_ID.appspot.com",
+  messagingSenderId: "YOUR_SENDER_ID",
+  appId: "YOUR_APP_ID"
 };
 // -----------------------------------------
 
@@ -191,25 +190,62 @@ const DAYS_FULL = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'
 let weekOffset = 0;
 let selectedDay = { gym: 0, water: 0, study: 0 };
 
+// ========================================
+//  IST (Indian Standard Time) UTC+5:30
+//  All dates are forced to IST so the app
+//  always shows the correct Indian date.
+// ========================================
+
+const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000; // 5h 30m in milliseconds
+
+function nowIST() {
+  // Current UTC ms + IST offset gives IST wall-clock time
+  return new Date(Date.now() + IST_OFFSET_MS);
+}
+
+function istDateStr(utcMs) {
+  // Convert any UTC timestamp to a YYYY-MM-DD string in IST
+  const d = new Date(utcMs + IST_OFFSET_MS);
+  const y   = d.getUTCFullYear();
+  const mo  = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(d.getUTCDate()).padStart(2, '0');
+  return `${y}-${mo}-${day}`;
+}
+
+function todayIST() {
+  return istDateStr(Date.now());
+}
+
 function getWeekDates(offset) {
-  const now = new Date();
-  const dow = now.getDay();
-  const diff = now.getDate() - dow + (dow === 0 ? -6 : 1);
-  const mon = new Date(now);
-  mon.setDate(diff + offset * 7);
-  mon.setHours(0,0,0,0);
+  // Build Mon-Sun week array using IST dates
+  const now  = nowIST();
+  const dow  = now.getUTCDay(); // 0=Sun, 1=Mon ... 6=Sat
+  const diffToMon = (dow === 0) ? -6 : 1 - dow;
+  const monUtc = new Date(now);
+  monUtc.setUTCDate(now.getUTCDate() + diffToMon + offset * 7);
+  monUtc.setUTCHours(0, 0, 0, 0);
   return Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(mon);
-    d.setDate(mon.getDate() + i);
-    return d.toISOString().slice(0, 10);
+    const d = new Date(monUtc);
+    d.setUTCDate(monUtc.getUTCDate() + i);
+    const y   = d.getUTCFullYear();
+    const mo  = String(d.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(d.getUTCDate()).padStart(2, '0');
+    return `${y}-${mo}-${day}`;
   });
 }
 
 function getWeekKey(offset) { return getWeekDates(offset)[0]; }
 
 function fmt(iso) {
-  const d = new Date(iso + 'T00:00:00');
-  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+  const [y, m, d] = iso.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d))
+    .toLocaleDateString('en-IN', { day: 'numeric', month: 'short', timeZone: 'Asia/Kolkata' });
+}
+
+function isoToIST(iso) {
+  const [y, m, d] = iso.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d))
+    .toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Asia/Kolkata' });
 }
 
 function getDayData(section, dayIdx) {
@@ -278,7 +314,7 @@ async function render() {
 
 function renderDayGrid(containerId, section) {
   const dates = getWeekDates(weekOffset);
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayIST(); // ✅ IST date
   const el = document.getElementById(containerId);
   el.innerHTML = dates.map((date, i) => {
     const dd = getDayData(section, i);
@@ -292,7 +328,7 @@ function renderDayGrid(containerId, section) {
     const todayCls = isToday ? 'today' : '';
     return `<button class="day-btn ${selCls} ${hasCls} ${todayCls}" onclick="selDay('${section}',${i})">
       <span class="day-name">${DAYS[i]}</span>
-      <span class="day-num">${new Date(date+'T00:00:00').getDate()}</span>
+      <span class="day-num">${date.split('-')[2].replace(/^0/,'')}</span>
       <div class="day-dot"></div>
     </button>`;
   }).join('');
@@ -315,7 +351,7 @@ function renderGym() {
   const dd = getDayData('gym', i);
   const dates = getWeekDates(weekOffset);
   document.getElementById('gym-day-label').textContent = DAYS_FULL[i];
-  document.getElementById('gym-date-label').textContent = new Date(dates[i]+'T00:00:00').toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'});
+  document.getElementById('gym-date-label').textContent = isoToIST(dates[i]);
 
   const el = document.getElementById('gym-content');
   let html = '';
@@ -498,7 +534,7 @@ function renderStudy() {
   const dd = getDayData('study', i);
   const dates = getWeekDates(weekOffset);
   document.getElementById('study-day-label').textContent = DAYS_FULL[i];
-  document.getElementById('study-date-label').textContent = new Date(dates[i]+'T00:00:00').toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'});
+  document.getElementById('study-date-label').textContent = isoToIST(dates[i]);
 
   const el = document.getElementById('study-content');
   let html = '';
@@ -616,7 +652,7 @@ function renderOverview() {
   </div>`;
 
   const dates = getWeekDates(weekOffset);
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayIST(); // ✅ IST date
   for (let i = 0; i < 7; i++) {
     const g = getDayData('gym', i);
     const w = getDayData('water', i);
