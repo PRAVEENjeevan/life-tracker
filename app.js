@@ -189,7 +189,7 @@ const DAYS      = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
 const DAYS_FULL = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
 
 let weekOffset = 0;
-let selectedDay = { gym: 0, water: 0, study: 0 };
+let selectedDay = { gym: 0, water: 0, food: 0, study: 0 };
 
 // ========================================
 //  IST (Indian Standard Time) UTC+5:30
@@ -197,41 +197,58 @@ let selectedDay = { gym: 0, water: 0, study: 0 };
 //  always shows the correct Indian date.
 // ========================================
 
-const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000; // 5h 30m in milliseconds
-
-function nowIST() {
-  // Current UTC ms + IST offset gives IST wall-clock time
-  return new Date(Date.now() + IST_OFFSET_MS);
-}
-
-function istDateStr(utcMs) {
-  // Convert any UTC timestamp to a YYYY-MM-DD string in IST
-  const d = new Date(utcMs + IST_OFFSET_MS);
-  const y   = d.getUTCFullYear();
-  const mo  = String(d.getUTCMonth() + 1).padStart(2, '0');
-  const day = String(d.getUTCDate()).padStart(2, '0');
-  return `${y}-${mo}-${day}`;
-}
+// ============================================
+//  IST DATE HELPERS — Asia/Kolkata (UTC+5:30)
+//  Uses Intl.DateTimeFormat to get the TRUE
+//  current date in IST, no manual offset math.
+// ============================================
 
 function todayIST() {
-  return istDateStr(Date.now());
+  // Returns "YYYY-MM-DD" for the current date in IST
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric', month: '2-digit', day: '2-digit'
+  }).formatToParts(new Date());
+  const p = {};
+  parts.forEach(({ type, value }) => { p[type] = value; });
+  return `${p.year}-${p.month}-${p.day}`;
+}
+
+function getISTDateParts(date) {
+  // Returns { year, month, day, weekday } for any Date object in IST
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    weekday: 'short'
+  }).formatToParts(date);
+  const p = {};
+  parts.forEach(({ type, value }) => { p[type] = value; });
+  return p;
 }
 
 function getWeekDates(offset) {
-  // Build Mon-Sun week array using IST dates
-  const now  = nowIST();
-  const dow  = now.getUTCDay(); // 0=Sun, 1=Mon ... 6=Sat
+  // Get Mon-Sun dates for the week (offset weeks from now), all in IST
+  const now = new Date();
+  const todayStr = todayIST();
+  const [y, m, d] = todayStr.split('-').map(Number);
+
+  // Find out which weekday today is in IST (0=Sun...6=Sat)
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Kolkata', weekday: 'short'
+  }).format(now);
+  const dayMap = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+  const dow = dayMap[parts] ?? new Date(y, m - 1, d).getDay();
+
+  // How many days back to Monday
   const diffToMon = (dow === 0) ? -6 : 1 - dow;
-  const monUtc = new Date(now);
-  monUtc.setUTCDate(now.getUTCDate() + diffToMon + offset * 7);
-  monUtc.setUTCHours(0, 0, 0, 0);
+
+  // Build 7 dates starting from Monday of this week + offset
   return Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(monUtc);
-    d.setUTCDate(monUtc.getUTCDate() + i);
-    const y   = d.getUTCFullYear();
-    const mo  = String(d.getUTCMonth() + 1).padStart(2, '0');
-    const day = String(d.getUTCDate()).padStart(2, '0');
-    return `${y}-${mo}-${day}`;
+    const date = new Date(Date.UTC(y, m - 1, d + diffToMon + offset * 7 + i));
+    const yy = date.getUTCFullYear();
+    const mm = String(date.getUTCMonth() + 1).padStart(2, '0');
+    const dd2 = String(date.getUTCDate()).padStart(2, '0');
+    return `${yy}-${mm}-${dd2}`;
   });
 }
 
@@ -258,7 +275,9 @@ function getDayData(section, dayIdx) {
       ? { workouts: [], note: '' }
       : section === 'water'
         ? { cups: 0, goal: 8 }
-        : { sessions: [], note: '' };
+        : section === 'food'
+          ? { meals: [], proteinGoal: 100 }
+          : { sessions: [], note: '' };
   }
   return data[wk][section][dayIdx];
 }
@@ -278,7 +297,7 @@ function esc(s) {
 
 window.changeWeek = async (dir) => {
   weekOffset += dir;
-  selectedDay = { gym: 0, water: 0, study: 0 };
+  selectedDay = { gym: 0, water: 0, food: 0, study: 0 };
   await loadData();
   render();
 };
@@ -291,6 +310,7 @@ window.switchTab = (tab) => {
   if (tab === 'overview') renderOverview();
   else if (tab === 'gym')  renderGym();
   else if (tab === 'water') renderWater();
+  else if (tab === 'food') renderFood();
   else if (tab === 'study') renderStudy();
 };
 
@@ -306,6 +326,7 @@ async function render() {
   if (tab === 'overview') renderOverview();
   else if (tab === 'gym')  renderGym();
   else if (tab === 'water') renderWater();
+  else if (tab === 'food') renderFood();
   else if (tab === 'study') renderStudy();
 }
 
