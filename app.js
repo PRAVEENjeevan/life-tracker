@@ -189,7 +189,7 @@ const DAYS      = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
 const DAYS_FULL = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
 
 let weekOffset = 0;
-let selectedDay = { gym: 0, water: 0, food: 0, study: 0 };
+let selectedDay = { gym: 0, water: 0, study: 0 };
 
 // ========================================
 //  IST (Indian Standard Time) UTC+5:30
@@ -275,9 +275,7 @@ function getDayData(section, dayIdx) {
       ? { workouts: [], note: '' }
       : section === 'water'
         ? { cups: 0, goal: 8 }
-        : section === 'food'
-          ? { meals: [], proteinGoal: 100 }
-          : { sessions: [], note: '' };
+        : { sessions: [], note: '' };
   }
   return data[wk][section][dayIdx];
 }
@@ -297,7 +295,7 @@ function esc(s) {
 
 window.changeWeek = async (dir) => {
   weekOffset += dir;
-  selectedDay = { gym: 0, water: 0, food: 0, study: 0 };
+  selectedDay = { gym: 0, water: 0, study: 0 };
   await loadData();
   render();
 };
@@ -310,7 +308,6 @@ window.switchTab = (tab) => {
   if (tab === 'overview') renderOverview();
   else if (tab === 'gym')  renderGym();
   else if (tab === 'water') renderWater();
-  else if (tab === 'food') renderFood();
   else if (tab === 'study') renderStudy();
 };
 
@@ -326,7 +323,6 @@ async function render() {
   if (tab === 'overview') renderOverview();
   else if (tab === 'gym')  renderGym();
   else if (tab === 'water') renderWater();
-  else if (tab === 'food') renderFood();
   else if (tab === 'study') renderStudy();
 }
 
@@ -548,144 +544,6 @@ window.setWaterGoal = (val) => {
 
 
 // ========================================
-//  FOOD
-// ========================================
-
-function renderFood() {
-  renderDayGrid('food-days', 'food');
-  const i = selectedDay.food;
-  const dd = getDayData('food', i);
-  const dates = getWeekDates(weekOffset);
-  document.getElementById('food-day-label').textContent = DAYS_FULL[i];
-  document.getElementById('food-date-label').textContent = isoToIST(dates[i]);
-
-  const el = document.getElementById('food-content');
-  const totalProtein = dd.meals.reduce((s, m) => s + (parseFloat(m.protein) || 0), 0);
-  const goal = dd.proteinGoal || 100;
-  const pct = Math.min(100, Math.round((totalProtein / goal) * 100));
-
-  let html = `<div style="padding:14px 18px 10px">
-    <div class="protein-goal-row">
-      <i class="ti ti-target" style="font-size:16px"></i>
-      Protein goal:
-      <input type="number" class="form-input food-focus" value="${goal}" min="1" max="400" style="width:70px" onchange="setProteinGoal(this.value)" />
-      g/day
-    </div>
-    <div style="margin-bottom:4px">
-      <div class="protein-progress-bar"><div class="protein-progress-fill" style="width:${pct}%"></div></div>
-    </div>
-    <div class="progress-label">${totalProtein.toFixed(0)}g of ${goal}g protein today — ${pct}%</div>
-  </div>`;
-
-  if (dd.meals.length === 0) {
-    html += `<div class="empty-state"><i class="ti ti-soup"></i>No meals logged for ${DAYS_FULL[i]}.<br>Add breakfast, lunch or dinner below.</div>`;
-  } else {
-    // Group meals by type
-    const order = ['breakfast', 'lunch', 'dinner', 'snack'];
-    const grouped = {};
-    dd.meals.forEach((m, mi) => {
-      if (!grouped[m.type]) grouped[m.type] = [];
-      grouped[m.type].push({ ...m, idx: mi });
-    });
-
-    html += '<ul class="meal-list">';
-    order.forEach(type => {
-      if (!grouped[type]) return;
-      const emoji = { breakfast: '🌅', lunch: '☀️', dinner: '🌙', snack: '🍎' }[type] || '';
-      html += `<li style="padding:8px 18px 4px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--c-text-3);border-bottom:1px solid var(--c-border)">${emoji} ${type}</li>`;
-      grouped[type].forEach(m => {
-        html += `<li class="meal-item" id="fi-${m.idx}">
-          <span class="meal-name">${esc(m.name)}</span>
-          <span class="meal-protein">${parseFloat(m.protein||0).toFixed(0)}g</span>
-          <div class="row-actions">
-            <button class="act-btn" onclick="editFood(${m.idx})" title="Edit"><i class="ti ti-pencil"></i></button>
-            <button class="act-btn danger" onclick="delFood(${m.idx})" title="Delete"><i class="ti ti-trash"></i></button>
-          </div>
-        </li>`;
-      });
-    });
-    html += '</ul>';
-  }
-
-  html += `<div class="add-section">
-    <div class="add-section-label">Add meal</div>
-    <div class="form-row">
-      <select id="f-type" class="form-input w110">
-        <option value="breakfast">🌅 Breakfast</option>
-        <option value="lunch">☀️ Lunch</option>
-        <option value="dinner">🌙 Dinner</option>
-        <option value="snack">🍎 Snack</option>
-      </select>
-      <input id="f-name" class="form-input flex2 food-focus" placeholder="What did you eat?" />
-      <input id="f-protein" class="form-input w80 food-focus" type="number" placeholder="Protein g" min="0" step="0.5" />
-      <button class="btn-add btn-add-food" onclick="addFood()"><i class="ti ti-plus"></i> Add</button>
-    </div>
-  </div>`;
-
-  el.innerHTML = html;
-  const nameEl = el.querySelector('#f-name');
-  if (nameEl) nameEl.addEventListener('keydown', e => { if (e.key === 'Enter') addFood(); });
-}
-
-window.addFood = () => {
-  const name = document.getElementById('f-name').value.trim();
-  if (!name) { document.getElementById('f-name').focus(); return; }
-  const dd = getDayData('food', selectedDay.food);
-  dd.meals.push({
-    type:    document.getElementById('f-type').value,
-    name,
-    protein: document.getElementById('f-protein').value.trim() || '0'
-  });
-  scheduleSave();
-  renderFood();
-  renderDayGrid('food-days', 'food');
-};
-
-window.delFood = (mi) => {
-  const dd = getDayData('food', selectedDay.food);
-  dd.meals.splice(mi, 1);
-  scheduleSave();
-  renderFood();
-  renderDayGrid('food-days', 'food');
-};
-
-window.editFood = (mi) => {
-  const dd = getDayData('food', selectedDay.food);
-  const m = dd.meals[mi];
-  const li = document.getElementById(`fi-${mi}`);
-  li.outerHTML = `<div class="edit-row" id="fi-${mi}">
-    <select id="ef-type" class="edit-input" style="width:115px">
-      <option value="breakfast"${m.type==='breakfast'?' selected':''}>🌅 Breakfast</option>
-      <option value="lunch"${m.type==='lunch'?' selected':''}>☀️ Lunch</option>
-      <option value="dinner"${m.type==='dinner'?' selected':''}>🌙 Dinner</option>
-      <option value="snack"${m.type==='snack'?' selected':''}>🍎 Snack</option>
-    </select>
-    <input id="ef-name" class="edit-input" value="${esc(m.name)}" placeholder="Meal" style="flex:2;min-width:100px" />
-    <input id="ef-protein" class="edit-input" type="number" value="${esc(m.protein||'0')}" placeholder="Protein g" min="0" step="0.5" style="width:80px" />
-    <button class="btn-save" onclick="saveFood(${mi})">Save</button>
-    <button class="btn-cancel" onclick="renderFood()">Cancel</button>
-  </div>`;
-};
-
-window.saveFood = (mi) => {
-  const dd = getDayData('food', selectedDay.food);
-  dd.meals[mi] = {
-    type:    document.getElementById('ef-type').value,
-    name:    document.getElementById('ef-name').value.trim(),
-    protein: document.getElementById('ef-protein').value.trim() || '0'
-  };
-  scheduleSave();
-  renderFood();
-};
-
-window.setProteinGoal = (val) => {
-  const dd = getDayData('food', selectedDay.food);
-  dd.proteinGoal = Math.max(1, parseInt(val) || 100);
-  scheduleSave();
-  renderFood();
-};
-
-// ========================================
 //  STUDY
 // ========================================
 
@@ -792,24 +650,19 @@ window.saveStudyNote = (val) => {
 
 function renderOverview() {
   let gymDays = 0, totalCups = 0, cupDays = 0, totalStudy = 0;
-  let totalProtein = 0, proteinDays = 0;
 
   for (let i = 0; i < 7; i++) {
     const g = getDayData('gym', i);
     const w = getDayData('water', i);
-    const f = getDayData('food', i);
     const s = getDayData('study', i);
     if (g.workouts.length > 0) gymDays++;
     if (w.cups > 0) { totalCups += w.cups; cupDays++; }
-    const dayProtein = f.meals.reduce((sum, m) => sum + (parseFloat(m.protein) || 0), 0);
-    if (dayProtein > 0) { totalProtein += dayProtein; proteinDays++; }
     totalStudy += s.sessions.reduce((sum, x) => sum + parseFloat(x.hours || 0), 0);
   }
 
-  document.getElementById('ov-gym').textContent     = gymDays;
-  document.getElementById('ov-water').textContent   = cupDays > 0 ? Math.round(totalCups / cupDays) : 0;
-  document.getElementById('ov-protein').textContent = proteinDays > 0 ? Math.round(totalProtein / proteinDays) + 'g' : '0g';
-  document.getElementById('ov-study').textContent   = totalStudy.toFixed(1) + 'h';
+  document.getElementById('ov-gym').textContent   = gymDays;
+  document.getElementById('ov-water').textContent = cupDays > 0 ? Math.round(totalCups / cupDays) : 0;
+  document.getElementById('ov-study').textContent = totalStudy.toFixed(1) + 'h';
 
   const dates = getWeekDates(weekOffset);
   const today = todayIST();
@@ -818,14 +671,12 @@ function renderOverview() {
     <span></span>
     <span style="color:var(--c-gym)"><i class="ti ti-barbell" style="font-size:12px"></i> Gym</span>
     <span style="color:var(--c-water)"><i class="ti ti-droplet" style="font-size:12px"></i> Water</span>
-    <span style="color:var(--c-food)"><i class="ti ti-soup" style="font-size:12px"></i> Food</span>
     <span style="color:var(--c-study)"><i class="ti ti-book" style="font-size:12px"></i> Study</span>
   </div>`;
 
   for (let i = 0; i < 7; i++) {
     const g = getDayData('gym', i);
     const w = getDayData('water', i);
-    const f = getDayData('food', i);
     const s = getDayData('study', i);
     const isToday = dates[i] === today;
 
@@ -837,12 +688,6 @@ function renderOverview() {
       ? `<span class="ov-val-water">${w.cups}/${w.goal || 8}</span>`
       : `<span class="ov-empty">—</span>`;
 
-    const dayProtein = f.meals.reduce((sum, m) => sum + (parseFloat(m.protein) || 0), 0);
-    const mealCount  = f.meals.length;
-    const foodV = mealCount > 0
-      ? `<span class="ov-val-food">${mealCount} meal${mealCount > 1 ? 's' : ''} · ${dayProtein.toFixed(0)}g</span>`
-      : `<span class="ov-empty">—</span>`;
-
     const studyHrs = s.sessions.reduce((sum, x) => sum + parseFloat(x.hours || 0), 0);
     const studyV = studyHrs > 0
       ? `<span class="ov-val-study">${studyHrs.toFixed(1)}h</span>`
@@ -850,7 +695,7 @@ function renderOverview() {
 
     rows += `<div class="ov-row">
       <span class="ov-day" style="${isToday ? 'color:var(--c-accent);font-weight:600' : ''}">${DAYS[i]}</span>
-      ${gymV}${waterV}${foodV}${studyV}
+      ${gymV}${waterV}${studyV}
     </div>`;
   }
   document.getElementById('ov-table').innerHTML = rows;
